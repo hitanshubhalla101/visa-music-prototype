@@ -66,6 +66,13 @@ npx vercel --prod
 3. Keep the detected settings (Vite · `npm run build` · `dist`) and click **Deploy**.
 4. Share the `https://<project>.vercel.app` URL. Every later push redeploys it.
 
+### GitHub Pages (already set up for this repo)
+
+`.github/workflows/pages.yml` builds and publishes on every push to `main`. Pages has no rewrite rules, so
+that build uses hash URLs: `https://<user>.github.io/visa-music-prototype/#/access` and `#/sweepstakes`
+(set by `VITE_HASH_ROUTER=1` and `VITE_BASE=./`). Deep links work as `#/access?step=code`. A Pages site
+on a free GitHub account is public.
+
 ### Netlify (drag and drop)
 
 1. Run `npm run build`.
