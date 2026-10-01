@@ -1,0 +1,285 @@
+/* ── Kinetic layer ────────────────────────────────────────────────────────────
+   120 BPM: one beat = 500 ms. Springs, not curves: every move overshoots a little
+   and settles. The pulse uses the flow's single accent colour (--accent). */
+
+:root {
+  --beat: 500ms;
+  --eighth: 250ms;
+  /* damped springs sampled into linear(): ζ 0.5 (16% overshoot), 0.62 (8%), 0.78 (2%) */
+  --spring-bouncy: linear(0, 0.044, 0.157, 0.31, 0.48, 0.647, 0.799, 0.927, 1.027, 1.097, 1.141, 1.16, 1.161, 1.149, 1.127, 1.1, 1.072, 1.046, 1.023, 1.004, 0.99, 0.98, 0.975, 0.973, 0.974, 0.977, 0.981, 0.986, 0.99, 0.994, 0.998, 1.001, 1.002, 1.004, 1.004, 1.004, 1);
+  --spring: linear(0, 0.029, 0.105, 0.211, 0.331, 0.457, 0.578, 0.69, 0.789, 0.873, 0.941, 0.994, 1.033, 1.059, 1.075, 1.082, 1.083, 1.079, 1.072, 1.062, 1.052, 1.041, 1.032, 1.023, 1.015, 1.008, 1.003, 0.999, 0.996, 0.994, 0.993, 0.993, 0.993, 0.994, 0.994, 0.995, 1);
+  --spring-soft: linear(0, 0.019, 0.069, 0.138, 0.22, 0.308, 0.396, 0.482, 0.563, 0.638, 0.705, 0.765, 0.816, 0.86, 0.897, 0.928, 0.953, 0.972, 0.988, 0.999, 1.007, 1.013, 1.017, 1.019, 1.02, 1.02, 1.019, 1.018, 1.016, 1.014, 1.013, 1.011, 1.009, 1.008, 1.006, 1.005, 1);
+  /* every existing entrance (rise, pop, fade…) now lands on a spring */
+  --ease-out-soft: var(--spring-soft);
+}
+@supports not (transition-timing-function: linear(0, 1)) {
+  :root {
+    --spring-bouncy: cubic-bezier(0.34, 1.56, 0.64, 1);
+    --spring: cubic-bezier(0.3, 1.35, 0.5, 1);
+    --spring-soft: cubic-bezier(0.25, 1.12, 0.4, 1);
+  }
+}
+/* strokes that draw a check must not overshoot past their end */
+.check-path,
+.check-ring {
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1) !important;
+}
+
+/* ── Buttons: idle on the bar, pressed drops like a beat ───────────────────── */
+@layer components {
+  .btn {
+    position: relative;
+    isolation: isolate;
+    transition: transform var(--beat) var(--spring-bouncy), background 0.2s, box-shadow 0.25s, opacity 0.2s, border-color 0.2s, filter 0.2s;
+  }
+  .btn:active:not(:disabled) {
+    transform: translateY(3px) scale(0.965);
+    transition-duration: 70ms;
+    transition-timing-function: cubic-bezier(0.5, 0, 1, 1);
+  }
+  .btn-primary::after {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    z-index: -1;
+    border-radius: inherit;
+    box-shadow: 0 0 0 1px var(--accent), 0 0 28px 2px var(--accent-glow);
+    opacity: 0;
+    pointer-events: none;
+    /* one swell per bar (4 beats), hitting on the downbeat */
+    animation: vm-idle calc(var(--beat) * 4) cubic-bezier(0.2, 0.6, 0.3, 1) infinite;
+  }
+  .btn-primary:disabled::after {
+    visibility: hidden;
+  }
+  .btn-primary:hover::after {
+    animation-play-state: paused;
+  }
+  .btn-primary:active:not(:disabled)::after {
+    opacity: 1;
+    animation: none;
+  }
+}
+@keyframes vm-idle {
+  0% { opacity: 0.85; transform: scale(1); }
+  30% { opacity: 0; transform: scale(1.06, 1.18); }
+  100% { opacity: 0; transform: scale(1.06, 1.18); }
+}
+
+/* ── Text on the beat ─────────────────────────────────────────────────────── */
+.bw {
+  display: inline-block;
+  animation: vm-word var(--beat) var(--spring) both;
+}
+@keyframes vm-word {
+  from { opacity: 0; transform: translateY(0.42em) scale(0.96); }
+  to { opacity: 1; transform: none; }
+}
+.beat-in {
+  animation: vm-field var(--beat) var(--spring) both;
+}
+@keyframes vm-field {
+  from { opacity: 0; transform: translateX(-18px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* numbers roll like an odometer; a hidden digit keeps the baseline and width */
+.roll-d {
+  position: relative;
+  display: inline-block;
+  clip-path: inset(0 -0.05em);
+}
+.roll-d > .ph {
+  visibility: hidden;
+}
+.roll-d > .strip {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transform: translateY(calc(var(--d) * -10%));
+  transition: transform calc(var(--beat) * 1.4) var(--spring) calc(var(--k, 0) * 45ms);
+}
+.roll-d > .strip > span {
+  display: block;
+}
+
+/* ── The pulse ────────────────────────────────────────────────────────────── */
+.vm-pulse {
+  --bw: 4px;
+  --bh: 24px;
+  --gap: 7px;
+  --core: 12px;
+  --spread: 1;
+  --eq: 0;
+  --ro: 0;
+  --cs: 0;
+  --ring-scale: 3.2;
+  position: relative;
+  display: inline-block;
+  flex-shrink: 0;
+  width: calc(var(--gap) * 9);
+  height: var(--bh);
+  color: var(--accent);
+  vertical-align: middle;
+}
+.vm-pulse.vm-sm { --bw: 3px; --bh: 18px; --gap: 5px; --core: 10px; }
+.vm-pulse.vm-lg { --bw: 5px; --bh: 30px; --gap: 10px; --core: 14px; }
+
+.vm-bar {
+  --sx: 1;
+  --sy: 0.2;
+  --op: 0;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: var(--bw);
+  height: var(--bh);
+  margin: calc(var(--bh) / -2) 0 0 calc(var(--bw) / -2);
+  opacity: var(--op);
+  transform: translateX(calc(var(--x) * var(--gap) * var(--spread))) scale(var(--sx), var(--sy));
+  transition: transform var(--beat) var(--spring-bouncy) calc(var(--ax) * 35ms), opacity calc(var(--beat) / 2) ease calc(var(--ax) * 35ms);
+}
+.vm-bar > b {
+  position: absolute;
+  inset: 0;
+  border-radius: 99px;
+  background: currentColor;
+  animation: vm-eq calc(var(--beat) * 2) infinite;
+  animation-delay: calc(var(--i) * -125ms);
+}
+@keyframes vm-eq {
+  0% { transform: scaleY(1); animation-timing-function: cubic-bezier(0.2, 0.7, 0.3, 1); }
+  42% { transform: scaleY(calc(1 - var(--eq) * var(--amp))); animation-timing-function: cubic-bezier(0.6, 0, 1, 1); }
+  50% { transform: scaleY(1); animation-timing-function: cubic-bezier(0.2, 0.7, 0.3, 1); }
+  92% { transform: scaleY(calc(1 - var(--eq) * (1 - var(--amp) * 0.5))); animation-timing-function: cubic-bezier(0.6, 0, 1, 1); }
+  100% { transform: scaleY(1); }
+}
+.vm-core {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: var(--core);
+  height: var(--core);
+  margin: calc(var(--core) / -2) 0 0 calc(var(--core) / -2);
+  transform: scale(var(--cs));
+  transition: transform var(--beat) var(--spring-bouncy);
+}
+.vm-core > b {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 12px var(--accent-glow);
+  animation: vm-kick var(--beat) cubic-bezier(0.2, 0.7, 0.3, 1) infinite;
+}
+@keyframes vm-kick {
+  0% { transform: scale(1.22); }
+  60%, 100% { transform: scale(1); }
+}
+.vm-rings {
+  position: absolute;
+  inset: 0;
+  opacity: var(--ro);
+  transition: opacity var(--beat) ease;
+  pointer-events: none;
+}
+.vm-rings > i {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: var(--core);
+  height: var(--core);
+  margin: calc(var(--core) / -2) 0 0 calc(var(--core) / -2);
+  border-radius: 50%;
+  border: 1.5px solid currentColor;
+  animation: vm-ring calc(var(--beat) * 2) cubic-bezier(0.15, 0.6, 0.3, 1) infinite;
+}
+.vm-rings > i:nth-child(2) { animation-delay: calc(var(--beat) * -1); }
+@keyframes vm-ring {
+  0% { transform: scale(1); opacity: 0.85; }
+  100% { transform: scale(var(--ring-scale)); opacity: 0; }
+}
+
+/* shapes */
+.vm-pulse[data-shape='dot'],
+.vm-pulse[data-shape='rest'] { --spread: 0; --cs: 1; }
+.vm-pulse[data-shape='dot'] { --ro: 1; }
+.vm-pulse[data-shape='rest'] { --cs: 0.8; }
+.vm-pulse[data-shape='wave'] { --eq: 0.6; }
+.vm-pulse[data-shape='wave'] .vm-bar { --sy: var(--wv); --sx: 0.75; --op: 1; }
+.vm-pulse[data-shape='bars'] { --eq: 0.7; }
+.vm-pulse[data-shape='bars'] .vm-bar { --sy: calc(0.35 + 0.65 * var(--amp)); --op: 1; }
+.vm-pulse[data-shape='progress'] .vm-bar { --sy: 0.42; --op: calc(0.26 + 0.74 * var(--on)); --eq: calc(0.35 * var(--on)); }
+.vm-pulse[data-shape='burst'] { --spread: 1.25; --eq: 1; --ro: 1; --ring-scale: 7; }
+.vm-pulse[data-shape='burst'] .vm-bar { --sy: 1; --op: 1; }
+
+/* the journey badge: the pulse sitting on the card's top edge */
+.vm-badge {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 124px;
+  height: 46px;
+  translate: -50% -50%;
+  border-radius: 999px;
+  background: rgb(7 11 24 / 0.94);
+  border: 1px solid color-mix(in srgb, var(--accent) 38%, transparent);
+  box-shadow: 0 0 34px -10px var(--accent-glow);
+  transition: width var(--beat) var(--spring-bouncy);
+}
+.vm-badge[data-shape='dot'],
+.vm-badge[data-shape='rest'] { width: 46px; }
+.vm-badge .vm-pulse { width: 100px; }
+
+/* ── Screen transitions: the next screen opens out of the pulse ──────────── */
+.vm-vt { view-transition-name: vm-pulse; }
+::view-transition-old(root) {
+  animation: none;
+}
+::view-transition-new(root) {
+  mix-blend-mode: normal;
+  animation: vm-open var(--beat) var(--spring) both;
+}
+@keyframes vm-open {
+  from { clip-path: circle(0 at var(--vt-x, 50%) var(--vt-y, 50%)); }
+  to { clip-path: circle(var(--vt-r, 150vmax) at var(--vt-x, 50%) var(--vt-y, 50%)); }
+}
+::view-transition-group(vm-pulse) {
+  animation-duration: var(--beat);
+  animation-timing-function: var(--spring-bouncy);
+}
+::view-transition-group(vm-header),
+::view-transition-group(vm-presenter) {
+  animation: none;
+}
+::view-transition-old(vm-header),
+::view-transition-old(vm-presenter) {
+  display: none;
+}
+::view-transition-new(vm-header),
+::view-transition-new(vm-presenter) {
+  animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* static and fully usable: no delayed entrances, no loops */
+  .bw,
+  .beat-in,
+  .btn-primary::after { animation: none !important; }
+  .vm-rings { display: none; }
+  .roll-d > .strip { transition: none; }
+}
+
+/* copying a rolled number copies its real text (the hidden twin), not the digit strips */
+.roll-x {
+  user-select: none;
+  -webkit-user-select: none;
+}
